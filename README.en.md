@@ -131,7 +131,8 @@ Each milestone ships a human-checkable verification script (see `scripts/`):
 python scripts/verify_math.py                              # exact math sanity checks
 python scripts/verify_adapter.py tests/fixtures/vllm_response.json   # token | H | ppl table
 # with a live server (vllm serve Qwen/Qwen2.5-0.5B-Instruct --max-logprobs 20):
-python scripts/verify_live.py --base-url http://localhost:8000/v1        # low- vs high-H contrast
+python scripts/verify_live.py --base-url http://localhost:8000/v1        # low- vs high-H contrast (smoke)
+python scripts/verify_battery.py --base-url http://localhost:8000/v1     # 12-pair statistical battery (win rate >= 80%)
 python scripts/verify_trajectory.py --base-url http://localhost:8000/v1  # CoT plot -> verify_output/
 ```
 

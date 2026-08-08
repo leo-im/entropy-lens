@@ -125,7 +125,8 @@ HuggingFace 어댑터는 전체 vocabulary를 보기 때문에 이 한계가 없
 python scripts/verify_math.py                              # 수학적 sanity check
 python scripts/verify_adapter.py tests/fixtures/vllm_response.json   # token | H | ppl 테이블
 # 라이브 서버 필요 (vllm serve Qwen/Qwen2.5-0.5B-Instruct --max-logprobs 20):
-python scripts/verify_live.py --base-url http://localhost:8000/v1        # 저 vs 고 엔트로피 대조
+python scripts/verify_live.py --base-url http://localhost:8000/v1        # 저 vs 고 엔트로피 대조 (스모크)
+python scripts/verify_battery.py --base-url http://localhost:8000/v1     # 대조 12쌍 통계 배터리 (승률 >= 80%)
 python scripts/verify_trajectory.py --base-url http://localhost:8000/v1  # CoT 플롯 -> verify_output/
 ```
 

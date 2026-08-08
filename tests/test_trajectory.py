@@ -5,14 +5,14 @@ from entropy_lens.trajectory import EntropyTrajectory, split_steps
 
 
 def tokenize(text: str) -> list[str]:
-    """Crude whitespace-preserving tokenizer for tests (space attaches left)."""
+    """Crude whitespace-preserving tokenizer for tests (whitespace attaches left)."""
     tokens = []
     word = ""
     for ch in text:
-        if ch == " ":
+        if ch in " \n":
             word += ch
         else:
-            if word.endswith(" "):
+            if word.endswith((" ", "\n")):
                 tokens.append(word)
                 word = ""
             word += ch
@@ -79,6 +79,54 @@ class TestSplitSteps:
         tokens = ["Pi", " is", " 3", ".", "14", " roughly", "."]
         # "3.14" has no whitespace after the dot, so no split there.
         assert split_steps(tokens, "sentence") == [0]
+
+
+class TestSentenceSplitRealWorld:
+    """Patterns that break naive sentence splitters in real CoT text."""
+
+    def check(self, text: str, expected_step_starts: list[str]):
+        tokens = tokenize(text)
+        bounds = split_steps(tokens, "sentence")
+        got = [tokens[b].strip() for b in bounds]
+        assert got == expected_step_starts, f"boundaries {bounds} -> {got}"
+
+    def test_title_abbreviation(self):
+        self.check("Dr. Smith arrived early. He sat down.", ["Dr.", "He"])
+
+    def test_multiple_titles(self):
+        self.check("Mr. and Mrs. Lee left. Prof. Kim stayed.", ["Mr.", "Prof."])
+
+    def test_eg_abbreviation(self):
+        self.check("Add fruit, e.g. apples or pears. Then mix well.", ["Add", "Then"])
+
+    def test_ie_abbreviation(self):
+        self.check("Use the base, i.e. bits. Then convert.", ["Use", "Then"])
+
+    def test_initials(self):
+        self.check("I met J. Smith yesterday. We talked.", ["I", "We"])
+
+    def test_dotted_acronym(self):
+        self.check("She moved to the U.S. in May. Life changed.", ["She", "Life"])
+
+    def test_decimal_then_sentence(self):
+        self.check("The rate is 3.14 percent. That is high.", ["The", "That"])
+
+    def test_ellipsis_and_newline(self):
+        self.check("Hmm... let me think.\nThe answer is 4.", ["Hmm...", "The"])
+
+    def test_numbered_list_lines(self):
+        text = "1. Add the numbers. 2. Multiply by two."
+        tokens = tokenize(text)
+        bounds = split_steps(tokens, "sentence")
+        # "1." / "2." are list markers; we accept splits at sentence ends only.
+        assert [tokens[b].strip() for b in bounds] == ["1.", "2."]
+
+    def test_abbreviation_at_text_start(self):
+        self.check("Dr. Lee spoke. Everyone listened.", ["Dr.", "Everyone"])
+
+    def test_lowercase_word_ending_sentence_still_splits(self):
+        # "no" is not in the abbreviation list on purpose.
+        self.check("I said no. Then I left.", ["I", "Then"])
 
 
 def make_trajectory() -> EntropyTrajectory:

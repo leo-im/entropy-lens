@@ -20,6 +20,65 @@ _STRATEGIES = {
     "step_marker": (r"(?:(?<=\n)|^)\s*[Ss]tep\s*\d+\s*[:.]", "start"),
 }
 
+#: Words whose trailing period usually marks an abbreviation, not a sentence
+#: end. Deliberately conservative: only entries that rarely close a sentence.
+_ABBREVIATIONS = frozenset(
+    [
+        "mr",
+        "mrs",
+        "ms",
+        "dr",
+        "prof",
+        "sr",
+        "jr",
+        "st",
+        "vs",
+        "cf",
+        "fig",
+        "eq",
+        "al",
+        "inc",
+        "ltd",
+        "dept",
+        "approx",
+        "resp",
+    ]
+)
+
+
+def _is_non_sentence_dot(text: str, dot_pos: int) -> bool:
+    """True if the '.' at ``dot_pos`` does not end a sentence.
+
+    Covers abbreviations ("Dr.", "e.g."), initials ("J. Smith"), ellipses
+    ("..."), and list-item markers ("1." at the start of a line or right
+    after a sentence end).
+    """
+    prev = text[:dot_pos]
+    # Part of an ellipsis run ("...").
+    if prev.endswith("."):
+        return True
+    # Dotted sequences like "e.g", "i.e", "U.S", "a.m" before this dot.
+    if (
+        dot_pos >= 2
+        and text[dot_pos - 2] == "."
+        and re.search(r"(?:^|[^\w.])(?:[A-Za-z]\.)*[A-Za-z]$", prev)
+    ):
+        return True
+    # List-item marker: a short number at the start of the text, of a line,
+    # or straight after a sentence end ("... numbers. 2. Multiply ...").
+    m_num = re.search(r"\d{1,3}$", prev)
+    if m_num:
+        before = prev[: m_num.start()].rstrip(" ")
+        return before == "" or before.endswith((".", "!", "?", ":", "\n"))
+    m = re.search(r"[A-Za-z]+$", prev)
+    if m is None:
+        return False
+    word = m.group()
+    # Single uppercase letter: an initial, as in "J. Smith".
+    if len(word) == 1 and word.isupper():
+        return True
+    return word.lower() in _ABBREVIATIONS
+
 
 def split_steps(
     tokens: list[str],
@@ -40,6 +99,9 @@ def split_steps(
         Token strings whose concatenation reconstructs the generated text.
     strategy:
         ``"sentence"`` (default), ``"paragraph"``, or ``"step_marker"``.
+        The sentence strategy skips periods that do not end a sentence:
+        abbreviations ("Dr.", "e.g."), initials ("J. Smith"), decimal
+        numbers, ellipses ("..."), and list-item markers ("1.").
         Ignored when ``pattern`` is given.
     pattern:
         Custom regex. With ``boundary="end"`` a step ends where the match
@@ -52,6 +114,7 @@ def split_steps(
     list[int]
         Step start indices, e.g. ``[0, 12, 30]`` for three steps.
     """
+    skip_abbreviations = False
     if pattern is None:
         if strategy not in _STRATEGIES:
             raise ValueError(
@@ -59,6 +122,7 @@ def split_steps(
                 f"(or pass a custom pattern), got {strategy!r}"
             )
         pattern, boundary = _STRATEGIES[strategy]
+        skip_abbreviations = strategy == "sentence"
     elif boundary not in ("end", "start"):
         raise ValueError(f'boundary must be "end" or "start", got {boundary!r}')
 
@@ -70,6 +134,8 @@ def split_steps(
 
     char_bounds: list[int] = []
     for m in re.finditer(pattern, text):
+        if skip_abbreviations and text[m.start()] == "." and _is_non_sentence_dot(text, m.start()):
+            continue
         if boundary == "end":
             # Step starts at the first non-whitespace char after the match.
             pos = m.end()
