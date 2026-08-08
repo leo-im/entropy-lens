@@ -50,13 +50,20 @@ def pick_model(base_url: str, api_key: str) -> str:
     return models["data"][0]["id"]
 
 
-def chat(base_url: str, api_key: str, model: str, prompt: str, top_logprobs: int) -> dict:
+def chat(
+    base_url: str,
+    api_key: str,
+    model: str,
+    prompt: str,
+    top_logprobs: int,
+    max_tokens: int = 4,
+) -> dict:
     return request_json(
         f"{base_url}/chat/completions",
         {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 4,
+            "max_tokens": max_tokens,
             "temperature": 0.0,
             "logprobs": True,
             "top_logprobs": top_logprobs,
