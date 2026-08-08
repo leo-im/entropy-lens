@@ -1,5 +1,7 @@
 # entropy-lens
 
+**English** | [한국어](README.ko.md)
+
 **Token-level entropy trajectories from LLM logprobs — logprobs in, entropy trajectory out.**
 
 `entropy-lens` computes and visualizes per-token uncertainty trajectories from the
