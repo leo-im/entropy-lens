@@ -95,6 +95,30 @@ class TestChatFormat:
         assert traj.entropies[0] == pytest.approx(0.0)
 
 
+class TestLlamaCppCapture:
+    """Real response captured from llama.cpp serving Qwen2.5-0.5B-Instruct."""
+
+    @pytest.fixture
+    def response(self) -> dict:
+        return json.loads((FIXTURES / "llamacpp_response.json").read_text())
+
+    def test_parse(self, response):
+        traj = from_openai_response(response)
+        assert traj.text == "Paris."
+        assert traj.entropies.shape == (len(traj.tokens),)
+        assert np.all(traj.entropies >= 0)
+
+    def test_top_k_present(self, response):
+        content = response["choices"][0]["logprobs"]["content"]
+        assert all(len(e["top_logprobs"]) == 20 for e in content)
+
+    def test_first_token_is_confident(self, response):
+        # "The capital of France is" -> "Paris" should be low entropy.
+        traj = from_openai_response(response)
+        assert traj.tokens[0] == "Paris"
+        assert traj.entropies[0] < 1.0
+
+
 class TestLegacyFormat:
     def make_response(self) -> dict:
         return {

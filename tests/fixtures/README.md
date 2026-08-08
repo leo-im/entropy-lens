@@ -14,3 +14,15 @@ vllm serve Qwen/Qwen2.5-0.5B-Instruct --max-logprobs 20
 python scripts/verify_live.py --base-url http://localhost:8000/v1 \
     --save-json tests/fixtures/vllm_response.json
 ```
+
+`llamacpp_response.json` — a **genuinely captured** `/v1/chat/completions`
+response from llama.cpp (`llama-server`) serving
+`Qwen/Qwen2.5-0.5B-Instruct-GGUF:Q4_K_M` on Apple Silicon (2026-08-08),
+prompt "Complete this sentence with one word: The capital of France is",
+top-20 logprobs per token. Captured with:
+
+```bash
+llama-server -hf Qwen/Qwen2.5-0.5B-Instruct-GGUF:Q4_K_M --port 8000
+python scripts/verify_live.py --base-url http://127.0.0.1:8000/v1 \
+    --save-json tests/fixtures/llamacpp_response.json
+```
