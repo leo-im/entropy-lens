@@ -67,6 +67,15 @@ the structure of uncertainty during decoding:
 `entropy-lens` is intentionally a *measurement* layer: it is designed as the
 common substrate for information-theoretic reliability tooling built on top.
 
+**It also works as a fine-tuning diagnostic.** Running `generate()` on a
+fixed probe set at each epoch during training (LoRA/SFT) and tracking the
+trajectories exposes phenomena like entropy collapse and calibration drift —
+"measurement during training" is still inference-time measurement, so the
+existing `from_hf_generate` adapter covers it as-is. Training loops and
+experiment code are out of scope for this library; they live in a separate
+experiment repo 
+that depends on it.
+
 ## Research philosophy
 
 The research this project belongs to starts from a question: *can intelligent
