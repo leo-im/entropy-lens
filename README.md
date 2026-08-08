@@ -1,30 +1,30 @@
 # entropy-lens
 
-**English** | [한국어](README.ko.md)
+**한국어** | [English](README.en.md)
 
-**Token-level entropy trajectories from LLM logprobs — logprobs in, entropy trajectory out.**
+**LLM logprobs로부터 토큰 단위 엔트로피 궤적을 — logprobs in, entropy trajectory out.**
 
-`entropy-lens` computes and visualizes per-token uncertainty trajectories from the
-`logprobs` an LLM API already returns. No multi-sampling, no auxiliary model, no
-extra forward passes — which makes it cheap enough to run on every request in a
-serving pipeline.
+`entropy-lens`는 LLM API가 이미 반환하는 `logprobs`만으로 토큰별 불확실성
+궤적을 계산·시각화합니다. 다중 샘플링도, 보조 모델도, 추가 forward pass도
+필요 없기 때문에 서빙 파이프라인에서 모든 요청에 대해 돌려도 될 만큼
+가볍습니다.
 
-![CoT entropy trajectory](docs/assets/demo_trajectory.png)
+![CoT 엔트로피 궤적](docs/assets/demo_trajectory.png)
 
-*Demo plot generated from structured synthetic data (`python scripts/generate_demo.py`);
-`scripts/verify_trajectory.py` produces the same plot from a live model.*
+*데모 플롯은 구조화된 합성 데이터로 생성한 것입니다(`python scripts/generate_demo.py`);
+`scripts/verify_trajectory.py`를 사용하면 실제 모델로부터 같은 플롯을 얻을 수 있습니다.*
 
-## Install
+## 설치
 
 ```bash
-pip install entropy-lens            # core (numpy only)
-pip install "entropy-lens[viz]"     # + matplotlib plotting
+pip install entropy-lens            # core (numpy만 의존)
+pip install "entropy-lens[viz]"     # + matplotlib 시각화
 ```
 
 ## Quickstart
 
-Point any OpenAI-compatible client (vLLM, SGLang, OpenAI) at your model, ask for
-logprobs, and hand the response to `entropy-lens`:
+OpenAI 호환 클라이언트(vLLM, SGLang, OpenAI)로 logprobs를 요청하고, 응답을
+그대로 `entropy-lens`에 넘기면 됩니다:
 
 ```python
 from openai import OpenAI
@@ -39,88 +39,86 @@ response = client.chat.completions.create(
     top_logprobs=20,
 )
 traj = from_openai_response(response, split="sentence")
-print(traj.summary())  # mean/max/min H, per-step decrease, monotonicity
-plot_trajectory(traj)  # token-level + step-level entropy plot
+print(traj.summary())  # 평균/최대/최소 H, 스텝별 감소량, 단조성
+plot_trajectory(traj)  # 토큰 단위 + 스텝 단위 엔트로피 플롯
 ```
 
-`traj` is an `EntropyTrajectory`: per-token entropies (`traj.entropies`, in bits
-by default so perplexity is `2**H`), the token strings, and step boundaries with
-step-level aggregates (`step_means()`, `delta_h()`, `summary()`).
+`traj`는 `EntropyTrajectory`입니다: 토큰별 엔트로피(`traj.entropies`, 기본
+단위는 bits라서 perplexity가 `2**H`로 해석됩니다), 토큰 문자열, 그리고 스텝
+경계와 스텝 단위 통계(`step_means()`, `delta_h()`, `summary()`)를 담습니다.
 
-## Why entropy trajectories?
+## 왜 엔트로피 궤적인가?
 
-A single scalar confidence hides *where* a generation was uncertain. The
-trajectory view — entropy per token, aggregated per reasoning step — exposes
-the structure of uncertainty during decoding:
+스칼라 하나짜리 confidence는 생성 과정의 *어디가* 불확실했는지 숨깁니다.
+궤적 관점 — 토큰별 엔트로피를 추론 스텝 단위로 집계 — 은 디코딩 중
+불확실성의 구조를 드러냅니다:
 
-- **Branch points**: entropy spikes mark positions where several continuations
-  were genuinely plausible; in CoT answers these are the forks where reasoning
-  paths diverge.
-- **Convergence patterns**: in typical multi-step reasoning, per-step mean
-  entropy trends downward as constraints accumulate; deviations from that
-  pattern are informative.
-- **Serving-friendly measurement**: because everything derives from single-pass
-  logprobs, trajectories can back per-request telemetry, retrieval-stopping
-  policies (e.g. expected-information-gain criteria), and reasoning-quality
-  diagnostics without changing the decoding budget.
+- **분기점**: 엔트로피 스파이크는 여러 continuation이 실제로 그럴듯했던
+  위치를 표시합니다. CoT 응답에서는 추론 경로가 갈라지는 지점입니다.
+- **수렴 패턴**: 전형적인 다단계 추론에서는 제약이 쌓이면서 스텝별 평균
+  엔트로피가 감소하는 경향이 있고, 이 패턴에서 벗어나는 지점이 유의미한
+  신호가 됩니다.
+- **서빙 친화적 측정**: 모든 것이 단일 pass의 logprobs에서 나오므로, 디코딩
+  비용을 바꾸지 않고도 요청별 텔레메트리, retrieval-stopping 정책(예: 기대
+  정보 이득(EIG) 기준), 추론 품질 진단의 기반으로 쓸 수 있습니다.
 
-`entropy-lens` is intentionally a *measurement* layer: it is designed as the
-common substrate for information-theoretic reliability tooling built on top.
+`entropy-lens`는 의도적으로 *측정* 계층에 머뭅니다: 그 위에 올라갈
+정보이론 기반 reliability 도구들의 공통 기반으로 설계되었습니다.
 
-## API at a glance
+## API 한눈에 보기
 
-| Function | What it does |
+| 함수 | 역할 |
 | --- | --- |
-| `token_entropy(logprobs, base="bits", tail="ignore")` | Shannon entropy of one position's top-k logprobs |
-| `sequence_entropies(logprobs_per_token, ...)` | Per-token entropy array for a sequence |
-| `perplexity_from_entropy(H)` | `2**H` — effective number of plausible next tokens |
-| `split_steps(tokens, "sentence" \| "paragraph" \| "step_marker", pattern=...)` | Segment tokens into reasoning steps |
-| `EntropyTrajectory` | `step_means()`, `delta_h()`, `summary()`, plotting input |
-| `adapters.from_openai_response(resp)` | Parse chat & legacy completions logprobs (OpenAI/vLLM/SGLang) |
-| `adapters.hf_transformers.from_hf_generate(out, tok)` | Exact full-vocab entropies from HF `generate()` scores |
-| `viz.plot_trajectory(traj)` | Token-level + step-level entropy figure |
+| `token_entropy(logprobs, base="bits", tail="ignore")` | 한 위치의 top-k logprobs로부터 Shannon entropy |
+| `sequence_entropies(logprobs_per_token, ...)` | 시퀀스 전체의 토큰별 엔트로피 배열 |
+| `perplexity_from_entropy(H)` | `2**H` — 그럴듯한 다음 토큰의 유효 개수 |
+| `split_steps(tokens, "sentence" \| "paragraph" \| "step_marker", pattern=...)` | 토큰을 추론 스텝으로 분할 |
+| `EntropyTrajectory` | `step_means()`, `delta_h()`, `summary()`, 플로팅 입력 |
+| `adapters.from_openai_response(resp)` | chat/legacy completions logprobs 파싱 (OpenAI/vLLM/SGLang) |
+| `adapters.hf_transformers.from_hf_generate(out, tok)` | HF `generate()` scores로부터 전체 vocab 정확 엔트로피 |
+| `viz.plot_trajectory(traj)` | 토큰 단위 + 스텝 단위 엔트로피 figure |
 
-## Limitations
+## 한계
 
-**Top-k logprobs give an entropy *estimate*, not the true entropy.** APIs
-return only the top-k (often ≤20) logprobs per position. `tail="ignore"`
-(default) renormalizes the top-k mass and in practice underestimates the true
-entropy; `tail="uniform"` spreads the residual mass uniformly over the rest of
-the vocabulary (`vocab_size` required) and gives an upper-bound-style estimate.
-The true value lies between the two; both converge as the distribution
-concentrates or k grows. The HuggingFace adapter is exempt — it sees the full
-vocabulary.
+**top-k logprobs로 계산한 엔트로피는 *추정치*이지 참값이 아닙니다.** API는
+위치당 top-k(보통 ≤20)개의 logprobs만 반환합니다. `tail="ignore"`(기본값)는
+top-k 질량을 재정규화하며 실제로는 참 엔트로피를 과소평가하는 경향이
+있고(하한 성격의 추정), `tail="uniform"`은 잔여 질량을 나머지 vocabulary에
+균등 분배해(`vocab_size` 필요) 상한 성격의 추정을 제공합니다. 참값은 두
+추정치 사이에 있으며, 분포가 집중되거나 k가 커질수록 둘은 수렴합니다.
+HuggingFace 어댑터는 전체 vocabulary를 보기 때문에 이 한계가 없습니다.
 
-**Low entropy ≠ correct.** Entropy measures the model's *confidence*, and
-models can be confidently wrong (and miscalibrated, especially after RLHF-style
-tuning). A falling trajectory means uncertainty collapsed, not that the answer
-is right. Use `entropy-lens` as a measurement instrument, not an accuracy
-judge.
+**낮은 엔트로피 ≠ 정답.** 엔트로피는 모델의 *확신*을 측정할 뿐이고, 모델은
+확신에 차서 틀릴 수 있습니다(특히 RLHF 계열 튜닝 이후에는 calibration이
+깨져 있는 경우가 많습니다). 궤적이 하강한다는 것은 불확실성이 붕괴했다는
+뜻이지 답이 맞다는 뜻이 아닙니다. `entropy-lens`는 측정 도구이지 정확도
+판단 도구가 아닙니다.
 
-**Tokenizer-dependent.** Entropies attach to tokens of the serving model;
-comparing absolute values across models with different tokenizers is not
-meaningful without care.
+**토크나이저 의존성.** 엔트로피는 서빙 모델의 토큰에 붙는 값입니다.
+토크나이저가 다른 모델 간에 절대값을 비교하는 것은 주의 없이는 의미가
+없습니다.
 
-## Verification scripts
+## 검증 스크립트
 
-Each milestone ships a human-checkable verification script (see `scripts/`):
+각 마일스톤마다 사람이 직접 확인할 수 있는 검증 스크립트를 제공합니다
+(`scripts/` 참고):
 
 ```bash
-python scripts/verify_math.py                              # exact math sanity checks
-python scripts/verify_adapter.py tests/fixtures/vllm_response.json   # token | H | ppl table
-# with a live server (vllm serve Qwen/Qwen2.5-0.5B-Instruct --max-logprobs 20):
-python scripts/verify_live.py --base-url http://localhost:8000/v1        # low- vs high-H contrast
-python scripts/verify_trajectory.py --base-url http://localhost:8000/v1  # CoT plot -> verify_output/
+python scripts/verify_math.py                              # 수학적 sanity check
+python scripts/verify_adapter.py tests/fixtures/vllm_response.json   # token | H | ppl 테이블
+# 라이브 서버 필요 (vllm serve Qwen/Qwen2.5-0.5B-Instruct --max-logprobs 20):
+python scripts/verify_live.py --base-url http://localhost:8000/v1        # 저 vs 고 엔트로피 대조
+python scripts/verify_trajectory.py --base-url http://localhost:8000/v1  # CoT 플롯 -> verify_output/
 ```
 
-`verify_live.py` also works against the OpenAI API (`--base-url
-https://api.openai.com/v1 --api-key ... --model gpt-4o-mini`) if you have no GPU.
+GPU가 없다면 `verify_live.py`는 OpenAI API로도 동작합니다(`--base-url
+https://api.openai.com/v1 --api-key ... --model gpt-4o-mini`).
 
-## Examples
+## 예제
 
-- [`examples/01_basic_trajectory.ipynb`](examples/01_basic_trajectory.ipynb) — fixture response → per-token entropy table and plot
-- [`examples/02_cot_step_entropy.ipynb`](examples/02_cot_step_entropy.ipynb) — CoT step segmentation, ΔH, step-level trajectory
+- [`examples/01_basic_trajectory.ipynb`](examples/01_basic_trajectory.ipynb) — fixture 응답 → 토큰별 엔트로피 테이블과 플롯
+- [`examples/02_cot_step_entropy.ipynb`](examples/02_cot_step_entropy.ipynb) — CoT 스텝 분할, ΔH, 스텝 단위 궤적
 
-## License
+## 라이선스
 
 MIT
