@@ -121,6 +121,21 @@ https://api.openai.com/v1 --api-key ... --model gpt-4o-mini`) if you have no GPU
 - [`examples/01_basic_trajectory.ipynb`](examples/01_basic_trajectory.ipynb) — fixture response → per-token entropy table and plot
 - [`examples/02_cot_step_entropy.ipynb`](examples/02_cot_step_entropy.ipynb) — CoT step segmentation, ΔH, step-level trajectory
 
+## Citation
+
+If you use this software in your research, please cite it as below (also
+available via GitHub's "Cite this repository" button):
+
+```bibtex
+@software{lim2026entropylens,
+  author  = {Lim, Leo},
+  title   = {entropy-lens: Token-level entropy trajectories from LLM logprobs},
+  year    = {2026},
+  url     = {https://github.com/leo-im/entropy-lens},
+  version = {0.1.0}
+}
+```
+
 ## License
 
 MIT

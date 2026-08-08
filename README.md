@@ -119,6 +119,21 @@ https://api.openai.com/v1 --api-key ... --model gpt-4o-mini`).
 - [`examples/01_basic_trajectory.ipynb`](examples/01_basic_trajectory.ipynb) — fixture 응답 → 토큰별 엔트로피 테이블과 플롯
 - [`examples/02_cot_step_entropy.ipynb`](examples/02_cot_step_entropy.ipynb) — CoT 스텝 분할, ΔH, 스텝 단위 궤적
 
+## 인용
+
+이 소프트웨어를 연구에 사용하셨다면 아래와 같이 인용해 주세요
+(GitHub의 "Cite this repository" 버튼으로도 복사할 수 있습니다):
+
+```bibtex
+@software{lim2026entropylens,
+  author  = {Lim, Leo},
+  title   = {entropy-lens: Token-level entropy trajectories from LLM logprobs},
+  year    = {2026},
+  url     = {https://github.com/leo-im/entropy-lens},
+  version = {0.1.0}
+}
+```
+
 ## 라이선스
 
 MIT

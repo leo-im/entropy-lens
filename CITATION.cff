@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "entropy-lens: Token-level entropy trajectories from LLM logprobs"
+type: software
+authors:
+  - family-names: "Lim"
+    given-names: "Leo"
+    email: "dlatmdals99@gmail.com"
+repository-code: "https://github.com/leo-im/entropy-lens"
+url: "https://github.com/leo-im/entropy-lens"
+license: MIT
+version: 0.1.0
+date-released: "2026-08-08"
+keywords:
+  - llm
+  - entropy
+  - uncertainty
+  - logprobs
+  - interpretability
+abstract: >-
+  A lightweight Python library that computes and visualizes token-level
+  entropy trajectories from LLM logprobs. Works from single-pass logprobs
+  only — no multi-sampling or auxiliary models — making it suitable for
+  serving pipelines and information-theoretic reliability research.
