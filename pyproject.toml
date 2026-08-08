@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "entropy-lens"
+version = "0.1.0"
+description = "Token-level entropy trajectories from LLM logprobs — logprobs in, entropy trajectory out."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "leo", email = "dlatmdals99@gmail.com" }]
+keywords = ["llm", "entropy", "uncertainty", "logprobs", "interpretability"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["numpy>=1.23"]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.6"]
+hf = ["torch>=2.0"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "ruff>=0.4"]
+
+[project.urls]
+Homepage = "https://github.com/leo-im/entropy-lens"
+Repository = "https://github.com/leo-im/entropy-lens"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/entropy_lens"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["src/entropy_lens"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
