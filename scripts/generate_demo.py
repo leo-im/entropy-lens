@@ -59,9 +59,7 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150)
     print(f"steps: {traj.n_steps}, tokens: {len(tokens)}")
-    for i, (text, mean) in enumerate(
-        zip(traj.step_texts(), traj.step_means(), strict=True), 1
-    ):
+    for i, (text, mean) in enumerate(zip(traj.step_texts(), traj.step_means(), strict=True), 1):
         print(f"  step {i}: mean H = {mean:.3f} bits | {text.strip()}")
     print(f"saved {out}")
 

@@ -41,9 +41,7 @@ def main() -> None:
     model = args.model or pick_model(args.base_url, args.api_key)
     print(f"server: {args.base_url}\nmodel:  {model}\n")
 
-    response = chat(
-        args.base_url, args.api_key, model, PROBLEM, args.top_logprobs, max_tokens=256
-    )
+    response = chat(args.base_url, args.api_key, model, PROBLEM, args.top_logprobs, max_tokens=256)
     traj = from_openai_response(response, split="sentence")
 
     print(f"completion ({len(traj.tokens)} tokens, {traj.n_steps} steps):\n")
