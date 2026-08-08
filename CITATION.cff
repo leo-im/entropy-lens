@@ -4,7 +4,7 @@ title: "entropy-lens: Token-level entropy trajectories from LLM logprobs"
 type: software
 authors:
   - family-names: "Lim"
-    given-names: "Leo"
+    given-names: "Seungmin"
     email: "dlatmdals99@gmail.com"
 repository-code: "https://github.com/leo-im/entropy-lens"
 url: "https://github.com/leo-im/entropy-lens"

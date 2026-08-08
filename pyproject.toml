@@ -9,7 +9,7 @@ description = "Token-level entropy trajectories from LLM logprobs — logprobs i
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-authors = [{ name = "leo", email = "dlatmdals99@gmail.com" }]
+authors = [{ name = "Seungmin Lim", email = "dlatmdals99@gmail.com" }]
 keywords = ["llm", "entropy", "uncertainty", "logprobs", "interpretability"]
 classifiers = [
     "Development Status :: 3 - Alpha",

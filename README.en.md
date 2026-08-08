@@ -128,7 +128,7 @@ available via GitHub's "Cite this repository" button):
 
 ```bibtex
 @software{lim2026entropylens,
-  author  = {Lim, Leo},
+  author  = {Lim, Seungmin},
   title   = {entropy-lens: Token-level entropy trajectories from LLM logprobs},
   year    = {2026},
   url     = {https://github.com/leo-im/entropy-lens},
