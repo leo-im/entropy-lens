@@ -67,6 +67,28 @@ the structure of uncertainty during decoding:
 `entropy-lens` is intentionally a *measurement* layer: it is designed as the
 common substrate for information-theoretic reliability tooling built on top.
 
+## Research philosophy
+
+The research this project belongs to starts from a question: *can intelligent
+reasoning be understood as the process of assessing one's current
+uncertainty, acquiring the most informative evidence, and progressively
+constraining the hypothesis space in the right direction toward a reliable
+decision?*
+
+This project's answer: **yes — except that whether the direction is "right"
+is not fully knowable from inside the system.** The magnitude, specificity,
+and convergence of uncertainty are self-measurable, but the final guarantee
+of direction (truth alignment) comes from outside the system — a gold
+reference or human judgment. The design problem of a trustworthy intelligent
+system is therefore not "perfect self-evaluation" but **the optimal
+allocation of finite external verification resources guided by the system's
+own signals** — the point where information theory (uncertainty
+quantification), epistemology (grounds of truth), and systems engineering
+(human-in-the-loop) meet.
+
+In this picture, `entropy-lens` covers the self-measurable part: uncertainty
+trajectories from single-pass logprobs.
+
 ## API at a glance
 
 | Function | What it does |
