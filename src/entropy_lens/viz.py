@@ -1,10 +1,11 @@
 """Plotting for entropy trajectories (requires the ``viz`` extra: matplotlib).
 
-Two building blocks plus one convenience wrapper:
+Building blocks plus one convenience wrapper:
 
 - :func:`plot_token_entropies` — per-token entropy line with step boundaries.
 - :func:`plot_step_means` — per-step mean entropy (the CoT-level trajectory).
-- :func:`plot_trajectory` — both, stacked in one figure.
+- :func:`plot_hv` — the trajectory as a path in the entropy–varentropy plane.
+- :func:`plot_trajectory` — token + step views, stacked in one figure.
 """
 
 from __future__ import annotations
@@ -99,6 +100,53 @@ def plot_step_means(traj: EntropyTrajectory, *, ax: Axes | None = None) -> Axes:
     ax.set_xticks(steps)
     ax.set_xlabel("step")
     ax.set_ylabel(f"mean entropy ({traj.base})")
+    ax.set_ylim(bottom=0)
+    return ax
+
+
+def plot_hv(
+    traj: EntropyTrajectory,
+    *,
+    level: str = "step",
+    ax: Axes | None = None,
+) -> Axes:
+    """The trajectory as a connected path in the entropy–varentropy plane.
+
+    Entropy (mean surprisal) separates confident from uncertain positions;
+    varentropy (variance of surprisal) separates *diffuse* uncertainty from
+    *tiered* competition between a few candidates. Plotting (H, V) per step
+    (or per token with ``level="token"``) shows which kind of uncertainty
+    each part of the generation carried. Requires ``traj.varentropies``.
+
+    No thresholds or decision regions are drawn: entropy-lens measures;
+    what counts as "high" is model- and task-dependent and belongs to the
+    consumer.
+    """
+    plt = _require_matplotlib()
+    if traj.varentropies is None:
+        raise ValueError("plot_hv requires a trajectory with varentropies")
+    if level not in ("step", "token"):
+        raise ValueError(f'level must be "step" or "token", got {level!r}')
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5.5, 4.5))
+
+    if level == "step":
+        h, v = traj.step_means(), traj.step_varentropy_means()
+        labels = [str(i + 1) for i in range(len(h))]
+    else:
+        h, v = traj.entropies, traj.varentropies
+        labels = None
+
+    ax.plot(h, v, color=_BOUNDARY, lw=1.0, ls=":", zorder=1)
+    ax.scatter(h, v, s=55 if labels else 18, color=_LINE, zorder=2)
+    if labels:
+        for hi, vi, lab in zip(h, v, labels, strict=True):
+            ax.annotate(lab, (hi, vi), textcoords="offset points", xytext=(6, 5), fontsize=8)
+
+    unit = "bits" if traj.base == "bits" else "nats"
+    ax.set_xlabel(f"entropy H ({unit})")
+    ax.set_ylabel(f"varentropy V ({unit}²)")
+    ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
     return ax
 

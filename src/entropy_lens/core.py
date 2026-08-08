@@ -86,25 +86,108 @@ def token_entropy(
                 f"vocab_size ({vocab_size}) must exceed the number of provided logprobs ({lp.size})"
             )
 
-    # Stable renormalization: q_i = exp(lp_i - logsumexp(lp)).
-    lse = _logsumexp(lp)
-    p = np.exp(lp)
-    total = float(p.sum())
-
-    residual = 1.0 - total
-    if tail == "uniform" and residual > 1e-12:
-        # H = -sum p ln p - r ln(r / (V - k)), in nats.
-        h_nats = -float(np.sum(p * lp))
-        n_tail = vocab_size - lp.size
-        h_nats -= residual * float(np.log(residual / n_tail))
-    else:
-        # Renormalized top-k entropy (also the fallback when the top-k mass
-        # already sums to ~1 and there is no residual to spread).
-        q_log = lp - lse
-        h_nats = -float(np.sum(np.exp(q_log) * q_log))
-
-    h_nats = max(h_nats, 0.0)  # guard tiny negative values from rounding
+    h_nats, _ = _surprisal_moments(lp, tail=tail, vocab_size=vocab_size)
     return h_nats / _LN2 if base == "bits" else h_nats
+
+
+def token_varentropy(
+    logprobs: np.ndarray,
+    *,
+    base: str = "bits",
+    tail: str = "ignore",
+    vocab_size: int | None = None,
+) -> float:
+    """Varentropy of a single token position from its top-k logprobs.
+
+    Varentropy is the *variance of the surprisal* under the distribution
+    itself: ``V = sum_i p_i (-log p_i - H)^2`` (Kontoyiannis & Verdu, 2014).
+    Where entropy is the mean surprisal, varentropy is its second central
+    moment — it measures how *unequal* the candidate probabilities are, not
+    how spread out the distribution is:
+
+    - a uniform distribution has maximal H but V = 0 (every candidate is
+      equally surprising — the surprisal is a constant);
+    - a one-hot distribution has H = 0 and V = 0;
+    - V is large for *tiered* distributions (a dominant candidate plus
+      low-probability alternatives), which entropy alone cannot distinguish
+      from diffuse uncertainty. This distinction is what entropy-based
+      samplers such as entropix exploit at decode time.
+
+    Units are bits² for ``base="bits"`` (nats² for ``"nats"``). The top-k
+    truncation caveat described in the module docstring applies to V exactly
+    as it does to H.
+
+    References
+    ----------
+    - I. Kontoyiannis and S. Verdu, "Optimal Lossless Data Compression:
+      Non-Asymptotics and Asymptotics" (source dispersion / varentropy),
+      IEEE Transactions on Information Theory, 2014.
+    - xjdr-alt/entropix (2024), entropy/varentropy-based adaptive sampling:
+      https://github.com/xjdr-alt/entropix
+    """
+    _check_base(base)
+    if tail not in _VALID_TAILS:
+        raise ValueError(f"tail must be one of {_VALID_TAILS}, got {tail!r}")
+
+    lp = np.asarray(logprobs, dtype=np.float64).ravel()
+    if lp.size == 0:
+        raise ValueError("logprobs is empty")
+    if np.any(np.isnan(lp)):
+        raise ValueError("logprobs contains NaN")
+
+    if tail == "uniform":
+        if vocab_size is None:
+            raise ValueError('vocab_size is required when tail="uniform"')
+        if vocab_size <= lp.size:
+            raise ValueError(
+                f"vocab_size ({vocab_size}) must exceed the number of provided logprobs ({lp.size})"
+            )
+
+    _, v_nats2 = _surprisal_moments(lp, tail=tail, vocab_size=vocab_size)
+    return v_nats2 / _LN2**2 if base == "bits" else v_nats2
+
+
+def sequence_varentropies(
+    logprobs_per_token: list[np.ndarray],
+    *,
+    base: str = "bits",
+    tail: str = "ignore",
+    vocab_size: int | None = None,
+) -> np.ndarray:
+    """Per-token varentropy for a whole sequence (see :func:`token_varentropy`)."""
+    return np.array(
+        [
+            token_varentropy(lp, base=base, tail=tail, vocab_size=vocab_size)
+            for lp in logprobs_per_token
+        ],
+        dtype=np.float64,
+    )
+
+
+def _surprisal_moments(lp: np.ndarray, *, tail: str, vocab_size: int | None) -> tuple[float, float]:
+    """Mean (entropy) and variance (varentropy) of the surprisal, in nats.
+
+    Input is assumed validated. The distribution is either the renormalized
+    top-k (``tail="ignore"``) or the top-k augmented with a uniform tail
+    (``tail="uniform"``), matching :func:`token_entropy`'s semantics.
+    """
+    p = np.exp(lp)
+    residual = 1.0 - float(p.sum())
+
+    if tail == "uniform" and residual > 1e-12:
+        n_tail = vocab_size - lp.size
+        s_tail = -float(np.log(residual / n_tail))
+        h = -float(np.sum(p * lp)) + residual * s_tail
+        v = float(np.sum(p * (-lp - h) ** 2)) + residual * (s_tail - h) ** 2
+    else:
+        # Renormalized top-k (also the fallback when the top-k mass already
+        # sums to ~1 and there is no residual to spread).
+        s = -(lp - _logsumexp(lp))  # surprisal of the renormalized dist
+        q = np.exp(-s)
+        h = float(np.sum(q * s))
+        v = float(np.sum(q * (s - h) ** 2))
+
+    return max(h, 0.0), max(v, 0.0)  # guard tiny negatives from rounding
 
 
 def sequence_entropies(

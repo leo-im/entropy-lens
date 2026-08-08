@@ -57,7 +57,7 @@ def from_hf_generate(
         raise ValueError("outputs.scores is empty (no generated tokens)")
 
     logits = np.stack([_to_numpy(s)[batch_index] for s in scores])
-    entropies = _softmax_entropy_rows(logits, base=base)
+    entropies, varentropies = _softmax_moments_rows(logits, base=base)
 
     seq = _to_numpy(sequences)[batch_index]
     gen_ids = seq[len(seq) - len(scores) :]
@@ -69,7 +69,7 @@ def from_hf_generate(
         boundaries = split_steps(tokens, split)
     else:
         boundaries = [0]
-    return EntropyTrajectory(entropies, tokens, boundaries, base=base)
+    return EntropyTrajectory(entropies, tokens, boundaries, base=base, varentropies=varentropies)
 
 
 def _to_numpy(x: Any) -> np.ndarray:
@@ -78,8 +78,8 @@ def _to_numpy(x: Any) -> np.ndarray:
     return np.asarray(x, dtype=np.float64)
 
 
-def _softmax_entropy_rows(logits: np.ndarray, *, base: str) -> np.ndarray:
-    """Exact softmax entropy of each row of a (T, vocab) logits matrix."""
+def _softmax_moments_rows(logits: np.ndarray, *, base: str) -> tuple[np.ndarray, np.ndarray]:
+    """Exact softmax entropy and varentropy of each row of (T, vocab) logits."""
     x = logits.astype(np.float64)
     x = x - x.max(axis=1, keepdims=True)
     # Masked vocab entries (e.g. -inf from suppressed tokens) contribute 0.
@@ -87,7 +87,12 @@ def _softmax_entropy_rows(logits: np.ndarray, *, base: str) -> np.ndarray:
     z = expx.sum(axis=1, keepdims=True)
     p = expx / z
     with np.errstate(divide="ignore", invalid="ignore"):
-        plogp = np.where(p > 0, p * (x - np.log(z)), 0.0)
-    h_nats = -plogp.sum(axis=1)
+        s = np.where(p > 0, -(x - np.log(z)), 0.0)  # surprisal in nats
+    h_nats = (p * s).sum(axis=1)
     h_nats = np.maximum(h_nats, 0.0)
-    return h_nats / np.log(2.0) if base == "bits" else h_nats
+    v_nats2 = (p * (s - h_nats[:, None]) ** 2).sum(axis=1)
+    v_nats2 = np.maximum(v_nats2, 0.0)
+    if base == "bits":
+        ln2 = np.log(2.0)
+        return h_nats / ln2, v_nats2 / ln2**2
+    return h_nats, v_nats2

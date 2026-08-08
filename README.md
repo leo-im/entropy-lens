@@ -65,6 +65,18 @@ plot_trajectory(traj)  # 토큰 단위 + 스텝 단위 엔트로피 플롯
 `entropy-lens`는 의도적으로 *측정* 계층에 머뭅니다: 그 위에 올라갈
 정보이론 기반 reliability 도구들의 공통 기반으로 설계되었습니다.
 
+**엔트로피와 varentropy: 불확실성의 두 축.** v0.2부터 모든 어댑터가
+엔트로피 H와 함께 **varentropy V**(surprisal의 분산, Kontoyiannis & Verdú
+2014)를 계산합니다. H는 "평균적으로 얼마나 불확실한가"를, V는 "그
+불확실성이 어떤 *모양*인가"를 잽니다: 균등분포는 H가 최대지만 모든 후보가
+똑같이 놀라우므로 **V = 0**이고, V가 커지는 것은 확률이 층져 있을 때 —
+유력 후보와 저확률 대안이 경합할 때 — 입니다. 즉 H만으로 구분되지 않는
+"고르게 모름"(확산형 불확실성)과 "소수 가설의 경합"(분기점)을 V가
+갈라줍니다. entropix가 디코딩 개입에 쓴 신호와 같은 양이지만, entropy-lens는
+철학대로 **측정만** 합니다 — 사분면 임계값이나 행동 규칙은 제공하지 않으며,
+해석은 사용 측의 몫입니다. `viz.plot_hv()`로 궤적을 H–V 평면 경로로 볼 수
+있습니다.
+
 **파인튜닝 진단에도 쓸 수 있습니다.** 학습(LoRA/SFT) 중 에폭마다 고정
 프로브 세트에 `generate()`를 돌려 궤적을 추적하면 entropy collapse나
 calibration 변화 같은 현상을 관찰할 수 있습니다 — "학습 중 측정"도 결국
@@ -96,13 +108,15 @@ logprobs로부터의 불확실성 궤적 — 을 담당하는 측정 계층입�
 | 함수 | 역할 |
 | --- | --- |
 | `token_entropy(logprobs, base="bits", tail="ignore")` | 한 위치의 top-k logprobs로부터 Shannon entropy |
-| `sequence_entropies(logprobs_per_token, ...)` | 시퀀스 전체의 토큰별 엔트로피 배열 |
+| `token_varentropy(logprobs, ...)` | 같은 입력으로부터 varentropy (surprisal의 분산) |
+| `sequence_entropies(logprobs_per_token, ...)` / `sequence_varentropies(...)` | 시퀀스 전체의 토큰별 H / V 배열 |
 | `perplexity_from_entropy(H)` | `2**H` — 그럴듯한 다음 토큰의 유효 개수 |
 | `split_steps(tokens, "sentence" \| "paragraph" \| "step_marker", pattern=...)` | 토큰을 추론 스텝으로 분할 |
 | `EntropyTrajectory` | `step_means()`, `delta_h()`, `summary()`, 플로팅 입력 |
 | `adapters.from_openai_response(resp)` | chat/legacy completions logprobs 파싱 (OpenAI/vLLM/SGLang) |
 | `adapters.hf_transformers.from_hf_generate(out, tok)` | HF `generate()` scores로부터 전체 vocab 정확 엔트로피 |
 | `viz.plot_trajectory(traj)` | 토큰 단위 + 스텝 단위 엔트로피 figure |
+| `viz.plot_hv(traj)` | H–V 평면 위의 궤적 경로 (스텝/토큰 단위) |
 
 ## 한계
 
@@ -146,6 +160,17 @@ https://api.openai.com/v1 --api-key ... --model gpt-4o-mini`).
 - [`examples/01_basic_trajectory.ipynb`](examples/01_basic_trajectory.ipynb) — fixture 응답 → 토큰별 엔트로피 테이블과 플롯
 - [`examples/02_cot_step_entropy.ipynb`](examples/02_cot_step_entropy.ipynb) — CoT 스텝 분할, ΔH, 스텝 단위 궤적
 
+## 참고문헌
+
+- **Varentropy (surprisal의 분산 / source dispersion)**: I. Kontoyiannis and
+  S. Verdú, "Optimal Lossless Data Compression: Non-Asymptotics and
+  Asymptotics," *IEEE Transactions on Information Theory*, vol. 60, no. 2,
+  2014. — varentropy의 정보이론적 정의와 성질.
+- **엔트로피/varentropy 기반 적응적 샘플링**: xjdr-alt,
+  [*entropix: entropy based sampling and parallel CoT decoding*](https://github.com/xjdr-alt/entropix),
+  2024. — H×V 신호를 디코딩 개입에 사용한 오픈소스 선행 작업. entropy-lens는
+  같은 신호를 개입 없이 측정 계층으로만 제공한다는 점에서 다릅니다.
+
 ## 인용
 
 이 소프트웨어를 연구에 사용하셨다면 아래와 같이 인용해 주세요
@@ -157,7 +182,7 @@ https://api.openai.com/v1 --api-key ... --model gpt-4o-mini`).
   title   = {entropy-lens: Token-level entropy trajectories from LLM logprobs},
   year    = {2026},
   url     = {https://github.com/leo-im/entropy-lens},
-  version = {0.1.0}
+  version = {0.2.0}
 }
 ```
 

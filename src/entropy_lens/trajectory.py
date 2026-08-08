@@ -171,12 +171,17 @@ class EntropyTrajectory:
         single step covering the whole sequence.
     base:
         Unit of ``entropies``: ``"bits"`` or ``"nats"``.
+    varentropies:
+        Optional per-token varentropy (see
+        :func:`entropy_lens.core.token_varentropy`), same length as
+        ``entropies``; units are bits² / nats² matching ``base``.
     """
 
     entropies: np.ndarray
     tokens: list[str]
     step_boundaries: list[int] = field(default_factory=list)
     base: str = "bits"
+    varentropies: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         self.entropies = np.asarray(self.entropies, dtype=np.float64)
@@ -187,6 +192,13 @@ class EntropyTrajectory:
                 f"tokens ({len(self.tokens)}) and entropies "
                 f"({self.entropies.size}) must have the same length"
             )
+        if self.varentropies is not None:
+            self.varentropies = np.asarray(self.varentropies, dtype=np.float64)
+            if self.varentropies.shape != self.entropies.shape:
+                raise ValueError(
+                    f"varentropies {self.varentropies.shape} must match "
+                    f"entropies {self.entropies.shape}"
+                )
         if not self.step_boundaries:
             self.step_boundaries = [0] if self.tokens else []
         if self.step_boundaries:
@@ -218,6 +230,15 @@ class EntropyTrajectory:
         """Mean entropy of each step."""
         return np.array([self.entropies[s].mean() for s in self.step_slices()])
 
+    def step_varentropy_means(self) -> np.ndarray:
+        """Mean varentropy of each step (requires ``varentropies``)."""
+        if self.varentropies is None:
+            raise ValueError(
+                "this trajectory has no varentropies — compute them with "
+                "sequence_varentropies() or use an adapter, which attaches them"
+            )
+        return np.array([self.varentropies[s].mean() for s in self.step_slices()])
+
     def delta_h(self) -> np.ndarray:
         """Change in mean entropy between consecutive steps.
 
@@ -238,7 +259,7 @@ class EntropyTrajectory:
         """
         means = self.step_means()
         deltas = np.diff(means)
-        return {
+        out = {
             "n_tokens": len(self.tokens),
             "n_steps": self.n_steps,
             "base": self.base,
@@ -249,4 +270,10 @@ class EntropyTrajectory:
             "last_step_mean": float(means[-1]),
             "total_decrease": float(means[0] - means[-1]),
             "monotonic_fraction": (float((deltas < 0).mean()) if deltas.size else float("nan")),
+            "mean_varentropy": None,
+            "max_varentropy": None,
         }
+        if self.varentropies is not None:
+            out["mean_varentropy"] = float(self.varentropies.mean())
+            out["max_varentropy"] = float(self.varentropies.max())
+        return out

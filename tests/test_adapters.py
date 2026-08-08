@@ -54,6 +54,12 @@ class TestChatFormat:
         un = from_openai_response(vllm_response, tail="uniform", vocab_size=151_936).entropies
         assert np.all(un >= ig)
 
+    def test_varentropies_attached(self, vllm_response):
+        traj = from_openai_response(vllm_response)
+        assert traj.varentropies is not None
+        assert traj.varentropies.shape == traj.entropies.shape
+        assert np.all(traj.varentropies >= 0)
+
     def test_model_dump_object(self, vllm_response):
         class FakeSDKResponse:
             def model_dump(self):
@@ -183,6 +189,18 @@ class TestHFAdapter:
         out = FakeGenerateOutput(sequences=np.array([[5, 0]]), scores=scores)
         traj = from_hf_generate(out, FakeTokenizer(), split=None)
         assert traj.entropies[0] == pytest.approx(1.0)
+        # Effectively uniform over 2 -> varentropy 0.
+        assert traj.varentropies[0] == pytest.approx(0.0, abs=1e-12)
+
+    def test_varentropy_tiered(self):
+        # logits ln(0.75)/ln(0.125)/ln(0.125) -> known tiered varentropy.
+        p = np.array([0.75, 0.125, 0.125])
+        scores = [np.log(p)[None, :]]
+        out = FakeGenerateOutput(sequences=np.array([[5, 0]]), scores=scores)
+        traj = from_hf_generate(out, FakeTokenizer(), split=None)
+        s = -np.log2(p)
+        h = float(np.sum(p * s))
+        assert traj.varentropies[0] == pytest.approx(float(np.sum(p * (s - h) ** 2)))
 
     def test_nats(self):
         scores = [np.zeros((1, 4))]

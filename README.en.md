@@ -67,6 +67,20 @@ the structure of uncertainty during decoding:
 `entropy-lens` is intentionally a *measurement* layer: it is designed as the
 common substrate for information-theoretic reliability tooling built on top.
 
+**Entropy and varentropy: two axes of uncertainty.** Since v0.2 every
+adapter computes **varentropy V** (the variance of the surprisal,
+Kontoyiannis & Verdú 2014) alongside entropy H. H measures *how much*
+uncertainty there is on average; V measures its *shape*: a uniform
+distribution has maximal H but **V = 0** (every candidate is equally
+surprising), while V grows when probabilities are tiered — a dominant
+candidate competing with low-probability alternatives. V therefore
+separates what H alone cannot: diffuse "evenly clueless" uncertainty from
+branch-point competition between a few hypotheses. This is the same signal
+the entropix sampler used to steer decoding — but true to its philosophy,
+entropy-lens only *measures* it: no quadrant thresholds, no decision rules;
+interpretation belongs to the consumer. `viz.plot_hv()` renders the
+trajectory as a path in the H–V plane.
+
 **It also works as a fine-tuning diagnostic.** Running `generate()` on a
 fixed probe set at each epoch during training (LoRA/SFT) and tracking the
 trajectories exposes phenomena like entropy collapse and calibration drift —
@@ -103,13 +117,15 @@ trajectories from single-pass logprobs.
 | Function | What it does |
 | --- | --- |
 | `token_entropy(logprobs, base="bits", tail="ignore")` | Shannon entropy of one position's top-k logprobs |
-| `sequence_entropies(logprobs_per_token, ...)` | Per-token entropy array for a sequence |
+| `token_varentropy(logprobs, ...)` | Varentropy (variance of surprisal) from the same input |
+| `sequence_entropies(logprobs_per_token, ...)` / `sequence_varentropies(...)` | Per-token H / V arrays for a sequence |
 | `perplexity_from_entropy(H)` | `2**H` — effective number of plausible next tokens |
 | `split_steps(tokens, "sentence" \| "paragraph" \| "step_marker", pattern=...)` | Segment tokens into reasoning steps |
 | `EntropyTrajectory` | `step_means()`, `delta_h()`, `summary()`, plotting input |
 | `adapters.from_openai_response(resp)` | Parse chat & legacy completions logprobs (OpenAI/vLLM/SGLang) |
 | `adapters.hf_transformers.from_hf_generate(out, tok)` | Exact full-vocab entropies from HF `generate()` scores |
 | `viz.plot_trajectory(traj)` | Token-level + step-level entropy figure |
+| `viz.plot_hv(traj)` | The trajectory as a path in the H–V plane (step/token level) |
 
 ## Limitations
 
@@ -153,6 +169,19 @@ https://api.openai.com/v1 --api-key ... --model gpt-4o-mini`) if you have no GPU
 - [`examples/01_basic_trajectory.ipynb`](examples/01_basic_trajectory.ipynb) — fixture response → per-token entropy table and plot
 - [`examples/02_cot_step_entropy.ipynb`](examples/02_cot_step_entropy.ipynb) — CoT step segmentation, ΔH, step-level trajectory
 
+## References
+
+- **Varentropy (variance of surprisal / source dispersion)**:
+  I. Kontoyiannis and S. Verdú, "Optimal Lossless Data Compression:
+  Non-Asymptotics and Asymptotics," *IEEE Transactions on Information
+  Theory*, vol. 60, no. 2, 2014 — the information-theoretic definition and
+  properties of varentropy.
+- **Entropy/varentropy-guided adaptive sampling**: xjdr-alt,
+  [*entropix: entropy based sampling and parallel CoT decoding*](https://github.com/xjdr-alt/entropix),
+  2024 — prior open-source work using the H×V signal to steer decoding.
+  entropy-lens provides the same signal as a measurement layer only, with
+  no decoding intervention.
+
 ## Citation
 
 If you use this software in your research, please cite it as below (also
@@ -164,7 +193,7 @@ available via GitHub's "Cite this repository" button):
   title   = {entropy-lens: Token-level entropy trajectories from LLM logprobs},
   year    = {2026},
   url     = {https://github.com/leo-im/entropy-lens},
-  version = {0.1.0}
+  version = {0.2.0}
 }
 ```
 

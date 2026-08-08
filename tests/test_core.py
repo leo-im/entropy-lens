@@ -5,7 +5,9 @@ from entropy_lens.core import (
     convert_entropy,
     perplexity_from_entropy,
     sequence_entropies,
+    sequence_varentropies,
     token_entropy,
+    token_varentropy,
 )
 
 
@@ -116,6 +118,78 @@ class TestSequenceEntropies:
         seq = [np.log(np.array([0.5, 0.2]))]
         h = sequence_entropies(seq, tail="uniform", vocab_size=100)
         assert h[0] > sequence_entropies(seq)[0]
+
+
+class TestTokenVarentropy:
+    @pytest.mark.parametrize("k", [2, 4, 8, 100])
+    def test_uniform_is_zero(self, k):
+        # Every candidate is equally surprising -> surprisal is constant.
+        assert token_varentropy(uniform_logprobs(k)) == pytest.approx(0.0, abs=1e-12)
+
+    def test_one_hot_is_zero(self):
+        lp = np.log(np.array([1.0 - 1e-12, 1e-12 / 3, 1e-12 / 3, 1e-12 / 3]))
+        assert token_varentropy(lp) == pytest.approx(0.0, abs=1e-6)
+
+    def test_tiered_exact_value(self):
+        # (0.75, 0.125, 0.125): surprisals differ -> V > 0, analytic value.
+        p = np.array([0.75, 0.125, 0.125])
+        s = -np.log2(p)
+        h = float(np.sum(p * s))
+        expected = float(np.sum(p * (s - h) ** 2))
+        assert token_varentropy(np.log(p)) == pytest.approx(expected)
+        assert expected > 1.0  # clearly tiered
+
+    def test_tiered_beats_uniform_despite_lower_entropy(self):
+        # Uniform has max H but zero V; the tiered distribution wins on V.
+        tiered = np.log(np.array([0.75, 0.125, 0.125]))
+        uniform = uniform_logprobs(8)
+        assert token_entropy(uniform) > token_entropy(tiered)
+        assert token_varentropy(uniform) < token_varentropy(tiered)
+
+    def test_nats_bits_conversion(self):
+        lp = np.log(np.array([0.6, 0.25, 0.1, 0.05]))
+        v_bits = token_varentropy(lp, base="bits")
+        v_nats = token_varentropy(lp, base="nats")
+        assert v_bits == pytest.approx(v_nats / np.log(2) ** 2)
+
+    def test_uniform_tail_exact_value(self):
+        # (0.5, 0.25) with 0.25 residual over vocab 4 -> 2 tail tokens @ 0.125.
+        p_full = np.array([0.5, 0.25, 0.125, 0.125])
+        s = -np.log(p_full)
+        h = float(np.sum(p_full * s))
+        expected = float(np.sum(p_full * (s - h) ** 2))
+        v = token_varentropy(
+            np.log(np.array([0.5, 0.25])), base="nats", tail="uniform", vocab_size=4
+        )
+        assert v == pytest.approx(expected)
+
+    def test_renormalization(self):
+        # Half-scale top-k must give the same V as the normalized version.
+        p = np.array([0.6, 0.3, 0.1])
+        assert token_varentropy(np.log(p / 2)) == pytest.approx(token_varentropy(np.log(p)))
+
+    def test_uniform_requires_vocab_size(self):
+        with pytest.raises(ValueError, match="vocab_size"):
+            token_varentropy(uniform_logprobs(4), tail="uniform")
+
+    def test_invalid_base(self):
+        with pytest.raises(ValueError, match="base"):
+            token_varentropy(uniform_logprobs(4), base="hartleys")
+
+    def test_invalid_tail(self):
+        with pytest.raises(ValueError, match="tail"):
+            token_varentropy(uniform_logprobs(4), tail="drop")
+
+    def test_empty_input(self):
+        with pytest.raises(ValueError, match="empty"):
+            token_varentropy(np.array([]))
+
+    def test_sequence_varentropies(self):
+        seq = [uniform_logprobs(4), np.log(np.array([0.75, 0.125, 0.125]))]
+        v = sequence_varentropies(seq)
+        assert v.shape == (2,)
+        assert v[0] == pytest.approx(0.0, abs=1e-12)
+        assert v[1] > 1.0
 
 
 class TestPerplexity:

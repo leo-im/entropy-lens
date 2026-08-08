@@ -7,7 +7,7 @@ Every check both asserts and prints a human-readable line.
 
 import numpy as np
 
-from entropy_lens import perplexity_from_entropy, token_entropy
+from entropy_lens import perplexity_from_entropy, token_entropy, token_varentropy
 
 
 def check(label: str, ok: bool, detail: str) -> None:
@@ -71,6 +71,21 @@ def main() -> None:
         h_ig < h_un,
         f'top-3 with 0.2 residual: tail="ignore" H = {h_ig:.4f} bits '
         f'< tail="uniform" H = {h_un:.4f} bits (true H lies in between)',
+    )
+
+    # 6. Varentropy: uniform -> 0 despite max H; tiered -> large V.
+    v_uniform = token_varentropy(np.full(8, np.log(1 / 8)))
+    p_tiered = np.array([0.75, 0.125, 0.125])
+    v_tiered = token_varentropy(np.log(p_tiered))
+    s = -np.log2(p_tiered)
+    h = float(np.sum(p_tiered * s))
+    v_expected = float(np.sum(p_tiered * (s - h) ** 2))
+    check(
+        "varentropy shape",
+        v_uniform < 1e-12 and abs(v_tiered - v_expected) < 1e-9,
+        f"uniform k=8: V = {v_uniform:.2e} (max H but constant surprisal -> 0); "
+        f"tiered (0.75,0.125,0.125): V = {v_tiered:.4f} bit^2 "
+        f"(analytic {v_expected:.4f})",
     )
 
     print("\nAll math sanity checks passed.")

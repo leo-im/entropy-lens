@@ -22,7 +22,7 @@ from typing import Any
 
 import numpy as np
 
-from entropy_lens.core import sequence_entropies
+from entropy_lens.core import sequence_entropies, sequence_varentropies
 from entropy_lens.trajectory import EntropyTrajectory, split_steps
 
 
@@ -83,13 +83,14 @@ def from_openai_response(
         )
 
     entropies = sequence_entropies(per_token, base=base, tail=tail, vocab_size=vocab_size)
+    varentropies = sequence_varentropies(per_token, base=base, tail=tail, vocab_size=vocab_size)
     if pattern is not None:
         boundaries = split_steps(tokens, pattern=pattern)
     elif split is not None:
         boundaries = split_steps(tokens, split)
     else:
         boundaries = [0] if tokens else []
-    return EntropyTrajectory(entropies, tokens, boundaries, base=base)
+    return EntropyTrajectory(entropies, tokens, boundaries, base=base, varentropies=varentropies)
 
 
 def _to_dict(response: dict | Any) -> dict:

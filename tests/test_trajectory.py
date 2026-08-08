@@ -195,3 +195,27 @@ class TestEntropyTrajectory:
     def test_non_1d_entropies(self):
         with pytest.raises(ValueError, match="1-D"):
             EntropyTrajectory(np.ones((2, 2)), ["a", "b"])
+
+    def test_varentropies_optional(self):
+        traj = make_trajectory()
+        assert traj.varentropies is None
+        s = traj.summary()
+        assert s["mean_varentropy"] is None and s["max_varentropy"] is None
+        with pytest.raises(ValueError, match="no varentropies"):
+            traj.step_varentropy_means()
+
+    def test_varentropies_attached(self):
+        traj = EntropyTrajectory(
+            np.array([1.0, 2.0, 3.0, 4.0]),
+            ["a", "b", "c", "d"],
+            [0, 2],
+            varentropies=np.array([0.1, 0.3, 0.5, 0.7]),
+        )
+        np.testing.assert_allclose(traj.step_varentropy_means(), [0.2, 0.6])
+        s = traj.summary()
+        assert s["mean_varentropy"] == pytest.approx(0.4)
+        assert s["max_varentropy"] == pytest.approx(0.7)
+
+    def test_varentropies_length_mismatch(self):
+        with pytest.raises(ValueError, match="varentropies"):
+            EntropyTrajectory(np.array([1.0, 2.0]), ["a", "b"], varentropies=np.array([0.1]))
